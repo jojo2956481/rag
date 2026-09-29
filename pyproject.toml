@@ -18,9 +18,6 @@ dev = [
     "mypy>=1.10",
 ]
 
-[project.scripts]
-rag = "rag.main:main"
-
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true

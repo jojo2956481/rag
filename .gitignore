@@ -1,1 +1,14 @@
-.venv
+.venv/
+__pycache__/
+.mypy_cache/
+*.zip
+moulinette*
+
+# Données : on garde seulement l'arborescence (.gitkeep)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/datasets/*/*
+!data/datasets/*/.gitkeep
+data/output/

@@ -8,13 +8,13 @@ install:
 	@uv sync --extra dev
 
 run: install
-	@uv run rag $(ARGS)
+	@uv run python -m src $(ARGS)
 
 ingest : install
-	@uv run rag ingest $(DIR)
+	@uv run ingest $(DIR)
 
 query : install
-	@uv run rag "$(Q)" --top_k=$(or $(K),5)
+	@uv run "$(Q)" --top_k=$(or $(K),5)
 
 debug:
 	@uv run python -m pdb -m llm_sdk.cli $(ARGS)
