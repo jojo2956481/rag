@@ -1,6 +1,6 @@
 import fire
 from src.cli import RagCLI
-
+import traceback
 
 def main():
     cli = RagCLI()
@@ -11,6 +11,7 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(e)
+        traceback.print_exc()
+        print(e, )
 
 
