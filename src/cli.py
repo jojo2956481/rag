@@ -1,8 +1,9 @@
 from pathlib import Path
-from src.models import ChunkIndex
+from src.models import ChunkIndex, MinimalSearchResults, MinimalSource, StudentSearchResults, RagDataset
 from src.indexing import Indexing
 import bm25s
 from src.retriever import Retriever
+from tqdm import tqdm
 
 
 class RagCLI:
@@ -63,16 +64,52 @@ class RagCLI:
                 f"[{c.first_character_index}:{c.last_character_index}]")
 
     def search_dataset(self, dataset_path: str, save_directory: str,
-                       k: int = 5) -> None:
+                       k: int = 5, index_dir: str = "data/processed") -> None:
         if not str(dataset_path):
             print("Error")
+            return
+        try:
+            with open(dataset_path, encoding="utf-8") as f:
+                dataset = RagDataset.model_validate_json(f.read())
+        except OSError as e:
+            print(e)
             return
         if not str(save_directory):
             print("Error")
             return
         if k <= 0:
             print("Error")
-        print("TODO search_dataset")
+            return
+        try:
+            retriever = Retriever(index_dir)
+        except Exception as e:
+            print(e)
+            return
+        questions = dataset.rag_questions
+        all_chunks = retriever.search([q.question for q in questions], k)
+        results: list[MinimalSearchResults] = []
+        for q, chunks in tqdm(zip(questions, all_chunks),
+                              total=len(questions), desc="Searching",
+                              unit="question"):
+            sources = [MinimalSource(
+                file_path=c.file_path,
+                first_character_index=c.first_character_index,
+                last_character_index=c.last_character_index,
+            ) for c in chunks]
+            results.append(MinimalSearchResults(
+                question_id=q.question_id, question=q.question,
+                retrieved_sources=sources))
+
+        output = StudentSearchResults(search_results=results, k=k)
+        out_path = Path(save_directory) / Path(dataset_path).name
+        try:
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(output.model_dump_json(indent=2))
+        except OSError as e:
+            print(f"Error: cannot write {out_path}: {e}")
+            return
+        print(f"Saved student_search_results to {out_path}")
 
     def answer(self, query: str, k: int = 5) -> None:
         print("TODO answer")
