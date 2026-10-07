@@ -1,0 +1,3 @@
+uv run python -m src index --max_chunk_size 2000
+
+uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json --save_directory data/output

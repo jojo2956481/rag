@@ -11,9 +11,12 @@ class Indexing():
         sections: list[tuple[int, int]] = []
         section_start = 0
         offset = 0
+        in_code_block = False
         if format == "md":
             for line in text.splitlines(keepends=True):
-                if line.startswith("#") and offset > section_start:
+                if line.startswith("```"):
+                    in_code_block = not in_code_block
+                elif line.startswith("#") and not in_code_block and offset > section_start:
                     sections.append((section_start, offset))
                     section_start = offset
                 offset += len(line)
@@ -56,4 +59,4 @@ class Indexing():
                         ))
         corpus_tokens = [tokenize(chunk.text) for chunk in tqdm(
             all_chunks, desc="Tokenizing", unit="chunk")]
-        return all_chunks, corpus_tokens
+        return all_chunks

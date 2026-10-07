@@ -4,6 +4,7 @@ from src.indexing import Indexing
 import bm25s
 from src.retriever import Retriever
 from tqdm import tqdm
+from src.tokenize import tokenize
 
 
 class RagCLI:
@@ -14,27 +15,31 @@ class RagCLI:
               raw_dir: str = "data/raw",
               index_dir: str = "data/processed") -> None:
         idx = Indexing()
+        prefix = "data/raw/vllm-0.10.1/"
         files_py = sorted(Path(raw_dir).rglob("*.py"))
         files_md = sorted(Path(raw_dir).rglob("*.md"))
         print(
             f"number of file.md: {len(files_md)}\n"
             f"number of file.py: {len(files_py)}"
             )
-        chunks_py, corpus_tokens_py = idx.open_file(
+        chunks_py = idx.open_file(
             files_py,
             max_chunk_size, "py")
-        chunks_md, corpus_tokens_md = idx.open_file(
+        chunks_md = idx.open_file(
             files_md,
             max_chunk_size, "md")
+        all_chunks = chunks_md + chunks_py
         print(f"chunk.md: {len(chunks_md)}\nchunk_py: {len(chunks_py)}")
+        corpus_tokens = [tokenize(c.text) + tokenize(c.file_path.removeprefix(prefix)) for c in tqdm(
+            all_chunks, desc="Tokenizing", unit="chunk")]
         out_dir = Path(index_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        data = ChunkIndex(chunks=chunks_py + chunks_md)
+        data = ChunkIndex(chunks=all_chunks)
         with open(out_dir / "chunks.json", "w", encoding="utf-8") as f:
             f.write(data.model_dump_json())
         retriever = bm25s.BM25()
         try:
-            retriever.index(corpus_tokens_md + corpus_tokens_py)
+            retriever.index(corpus_tokens)
             retriever.save(str(Path(index_dir) / "bm25"))
         except Exception as e:
             print(e)
@@ -44,7 +49,7 @@ class RagCLI:
             f"under {index_dir}/")
 
     def search(
-            self, query: str, k: int = 5,
+            self, query: str, k: int = 10,
             index_dir: str = "data/processed") -> None:
         if not str(query):
             print("Error")
@@ -57,14 +62,14 @@ class RagCLI:
         except Exception as e:
             print(e)
             return
-        result = retriever.search(str(query), k)[0]
+        result = retriever.search([str(query)], k)[0]
         for c in result:
             print(
                 f"{c.file_path} "
                 f"[{c.first_character_index}:{c.last_character_index}]")
 
     def search_dataset(self, dataset_path: str, save_directory: str,
-                       k: int = 5, index_dir: str = "data/processed") -> None:
+                       k: int = 10, index_dir: str = "data/processed") -> None:
         if not str(dataset_path):
             print("Error")
             return
@@ -120,4 +125,18 @@ class RagCLI:
 
     def evaluate(self, student_search_results_path: str,
                  dataset_path: str) -> None:
+        try:
+            with open(student_search_results_path, encoding="utf-8") as f:
+                search_results = StudentSearchResults.model_validate_json(f.read())
+        except OSError as e:
+            print(e)
+            return
+        try:
+            with open(dataset_path, encoding="utf-8") as f:
+                dataset = RagDataset.model_validate_json(f.read())
+        except OSError as e:
+            print(e)
+            return
+        
+        
         print("TODO evaluate")
