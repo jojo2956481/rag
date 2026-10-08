@@ -1,10 +1,11 @@
 from pathlib import Path
-from src.models import ChunkIndex, MinimalSearchResults, MinimalSource, StudentSearchResults, RagDataset
+from src.models import ChunkIndex, MinimalSearchResults, MinimalSource, StudentSearchResults, RagDataset, AnsweredQuestion
 from src.indexing import Indexing
 import bm25s
 from src.retriever import Retriever
 from tqdm import tqdm
 from src.tokenize import tokenize
+from src.evaluate import iou
 
 
 class RagCLI:
@@ -18,6 +19,7 @@ class RagCLI:
         prefix = "data/raw/vllm-0.10.1/"
         files_py = sorted(Path(raw_dir).rglob("*.py"))
         files_md = sorted(Path(raw_dir).rglob("*.md"))
+        files_txt = sorted(Path(raw_dir).rglob("*.txt"))
         print(
             f"number of file.md: {len(files_md)}\n"
             f"number of file.py: {len(files_py)}"
@@ -28,7 +30,10 @@ class RagCLI:
         chunks_md = idx.open_file(
             files_md,
             max_chunk_size, "md")
-        all_chunks = chunks_md + chunks_py
+        chunks_txt = idx.open_file(
+            files_txt,
+            max_chunk_size, "txt")
+        all_chunks = chunks_md + chunks_py + chunks_txt
         print(f"chunk.md: {len(chunks_md)}\nchunk_py: {len(chunks_py)}")
         corpus_tokens = [tokenize(c.text) + tokenize(c.file_path.removeprefix(prefix)) for c in tqdm(
             all_chunks, desc="Tokenizing", unit="chunk")]
@@ -123,11 +128,11 @@ class RagCLI:
                        save_directory: str) -> None:
         print("TODO answer_dataset")
 
-    def evaluate(self, student_search_results_path: str,
-                 dataset_path: str) -> None:
+    def evaluate(self, results_path: str,
+                 dataset_path: str, k: int = 10, display: bool = False) -> None:
         try:
-            with open(student_search_results_path, encoding="utf-8") as f:
-                search_results = StudentSearchResults.model_validate_json(f.read())
+            with open(results_path, encoding="utf-8") as f:
+                results = StudentSearchResults.model_validate_json(f.read())
         except OSError as e:
             print(e)
             return
@@ -137,6 +142,32 @@ class RagCLI:
         except OSError as e:
             print(e)
             return
-        
-        
-        print("TODO evaluate")
+        expected: dict[str, list[MinimalSource]] = {}
+        for q in dataset.rag_questions:
+            if isinstance(q, AnsweredQuestion):
+                expected[q.question_id] = q.sources
+        recalls: list[float] = []
+        for result in results.search_results:
+            sources = expected.get(result.question_id)
+            if not sources:
+                continue
+            retrieved = result.retrieved_sources[:k]
+            found = 0
+            for source in sources:
+                if any(iou(source, r) >= 0.05 for r in retrieved):
+                    found += 1
+            recalls.append(found / len(sources))
+            if found < len(sources) and display:
+                print(f"\nMISSED: {result.question}")
+                for s in sources:
+                    print(
+                        f"  expected: {s.file_path} "
+                        f"[{s.first_character_index}:{s.last_character_index}]")
+                for r in retrieved:
+                    print(
+                        f"  got:      {r.file_path} "
+                        f"[{r.first_character_index}:{r.last_character_index}]")
+        if not recalls:
+            print("Error: no question in common between the two files.")
+            return
+        print(f"Recall@{k}: {sum(recalls) / len(recalls):.3f}")

@@ -23,6 +23,8 @@ class Indexing():
             if section_start < len(text):
                 sections.append((section_start, len(text)))
             return sections
+        elif format == "txt":
+            return [(0, len(text))]
         else:
             lines = text.splitlines(keepends=True)
             for i, line in enumerate(lines):

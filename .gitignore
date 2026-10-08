@@ -4,7 +4,7 @@ __pycache__/
 *.zip
 moulinette*
 
-# Données : on garde seulement l'arborescence (.gitkeep)
+
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
