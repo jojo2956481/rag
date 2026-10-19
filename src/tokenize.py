@@ -1,5 +1,4 @@
 import re
-import Stemmer
 
 
 def tokenize(text: str) -> list[str]:
