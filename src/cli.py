@@ -7,7 +7,6 @@ from tqdm import tqdm
 from src.tokenize import tokenize
 from src.evaluate import iou
 from src.generate import Generate
-import json
 
 
 class RagCLI:

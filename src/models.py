@@ -44,10 +44,13 @@ class StudentSearchResults(BaseModel):
     k: int
 
 
+class MinimalAnswer(MinimalSearchResults):
+    answer: str
+
+
 class StudentSearchResultsAndAnswer(BaseModel):
-    search_results: List[MinimalSearchResults]
+    search_results: List[MinimalAnswer]
     k: int
 
 
-class MinimalAnswer(MinimalSearchResults):
-    answer: str
+
